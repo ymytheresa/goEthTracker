@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -67,30 +66,43 @@ func setTokenTracker() TokenTracker {
 
 // StartTracking begins listening for Transfer events
 func (t *TokenTracker) StartTracking() error {
-	logs := make(chan types.Log)
-	sub, err := t.client.SubscribeFilterLogs(context.Background(), ethereum.FilterQuery{}, logs)
+	txHash := common.HexToHash("0xcb6d95b941d3213eeaaaf3d8b78cec8b4d71400f9712bc649a1e64d59124ab85")
+	tx, isPending, err := t.client.TransactionByHash(context.Background(), txHash)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to logs: %v", err)
+		return fmt.Errorf("failed to get transaction: %v", err)
 	}
 
-	go func() {
-		fmt.Println("Starting to listen for all events...")
-		for {
-			select {
-			case err := <-sub.Err():
-				log.Fatal(err)
-			case vLog := <-logs:
-				fmt.Printf("Received log: %+v\n", vLog)
-				event, err := t.parseTransferEvent(vLog)
-				if err != nil {
-					log.Printf("Failed to parse event: %v", err)
-					continue
-				}
-				t.transfers = append(t.transfers, event)
-				fmt.Printf("Event: From %s, To %s, Value %s, TxHash %s\n", event.From, event.To, event.Value, event.TxHash)
-			}
+	if isPending {
+		fmt.Println("Transaction is still pending")
+	} else {
+		receipt, err := t.client.TransactionReceipt(context.Background(), txHash)
+		if err != nil {
+			return fmt.Errorf("failed to get transaction receipt: %v", err)
 		}
-	}()
+
+		fmt.Printf("Transaction details:\n")
+		from, err := types.Sender(types.NewEIP155Signer(tx.ChainId()), tx)
+		if err != nil {
+			return fmt.Errorf("failed to get transaction sender: %v", err)
+		}
+		fmt.Printf("From: %s\n", from.Hex())
+		fmt.Printf("To: %s\n", tx.To().Hex())
+		fmt.Printf("Value: %s wei\n", tx.Value().String())
+		fmt.Printf("Gas Price: %s wei\n", tx.GasPrice().String())
+		fmt.Printf("Gas Limit: %d\n", tx.Gas())
+		fmt.Printf("Nonce: %d\n", tx.Nonce())
+		fmt.Printf("Block Number: %d\n", receipt.BlockNumber)
+		fmt.Printf("Gas Used: %d\n", receipt.GasUsed)
+
+		for _, log := range receipt.Logs {
+			event, err := t.parseTransferEvent(*log)
+			if err != nil {
+				fmt.Printf("Failed to parse event: %v\n", err)
+				continue
+			}
+			fmt.Printf("Transfer Event: From %s, To %s, Value %s\n", event.From, event.To, event.Value)
+		}
+	}
 
 	return nil
 }
