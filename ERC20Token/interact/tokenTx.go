@@ -1,4 +1,4 @@
-package deploy
+package interact
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"log"
 	"math/big"
 
-	"goEthTracker/connection"
-	"goEthTracker/contractsgo"
+	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/connection"
+	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/contractsgo"
 
 	"github.com/defiweb/go-eth/abi"
 	"github.com/ethereum/go-ethereum"
@@ -15,35 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
-
-func deployTestERC20Contract() string {
-	auth, client, fromAddress, nonce, gasPrice, _ := connection.GetNextTransaction()
-
-	fmt.Println("Deploying TestERC20 contract...")
-
-	auth.From = fromAddress
-	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = big.NewInt(0)
-	auth.GasLimit = uint64(30000000)
-	auth.GasPrice = gasPrice
-
-	address, tx, _, err := contractsgo.DeployTestERC20(auth, client)
-	if err != nil {
-		fmt.Println("here")
-		log.Fatal(err)
-	}
-
-	_, err = bind.WaitDeployed(context.Background(), client, tx)
-	if err != nil {
-		fmt.Println("there")
-		log.Fatal(err)
-	}
-
-	fmt.Println("The contract is deployed at address: ", address)
-	fmt.Printf("Transaction hash: 0x%x\n\n", tx.Hash())
-
-	return address.String()
-}
 
 func TransferTokens(contractAddress string, toAddress common.Address, value int64) {
 	_, client, fromAddress, nonce, gasPrice, _ := connection.GetNextTransaction()
@@ -123,10 +94,4 @@ func GetBalance(testERC20 *contractsgo.TestERC20, address common.Address) *big.I
 		log.Fatal(err)
 	}
 	return balance
-}
-
-func RunTestERC20Contract() {
-	testERC20ContractAddress := deployTestERC20Contract()
-	toAddress := connection.GenerateNewWallet()
-	TransferTokens(testERC20ContractAddress, toAddress, 10)
 }

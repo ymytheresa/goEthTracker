@@ -1,6 +1,8 @@
 package main
 
-import "goEthTracker/deploy"
+import (
+	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/deploy"
+)
 
 func main() {
 	// Storage contract
