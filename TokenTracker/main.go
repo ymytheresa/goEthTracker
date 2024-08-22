@@ -1,23 +1,14 @@
 package main
 
-import (
-	"fmt"
-	"log"
-)
+import "time"
 
 func main() {
-	tracker, err := NewTokenTracker()
-	if err != nil {
-		log.Fatalf("Failed to create token tracker: %v", err)
-	}
+	tracker := setTokenTracker()
+	go tracker.StartTracking() // Start the existing event tracking
 
-	fmt.Printf("Starting to track events for contract: %s\n", tracker.contractAddress.Hex())
+	// Monitor contract transfers every 5 minutes
+	go tracker.MonitorContractTransfers(5 * time.Second)
 
-	err = tracker.StartTracking()
-	if err != nil {
-		log.Fatalf("Failed to start tracking: %v", err)
-	}
-
-	// Keep the program running
+	// Keep the main goroutine running
 	select {}
 }

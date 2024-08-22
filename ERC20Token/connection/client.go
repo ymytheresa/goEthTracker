@@ -54,11 +54,12 @@ func Connection() (*ethclient.Client, *big.Int, common.Address, *ecdsa.PrivateKe
 	}
 
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-
+	fmt.Println("From address:", fromAddress.Hex())
 	balance, err := client.BalanceAt(context.Background(), fromAddress, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	fmt.Println("The ETH balance of the account is:", balance)
 	fmt.Println("------------------------------------------------------------------------")
 

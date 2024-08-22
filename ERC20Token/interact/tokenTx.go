@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"sync"
 
 	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/connection"
 	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/contractsgo"
@@ -16,12 +17,29 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
+var (
+	testERC20Contract *contractsgo.TestERC20
+	testERC20Mu       sync.Mutex
+)
+
 func TransferTokens(contractAddress string, toAddress common.Address, value int64) {
 	_, client, fromAddress, nonce, gasPrice, _ := connection.GetNextTransaction()
 
 	fmt.Println("Transferring TestERC20 tokens...")
-
 	transferTokensWithGasEstimate(client, fromAddress, toAddress, nonce, gasPrice, value, contractAddress)
+}
+
+func GetClient() *ethclient.Client {
+	_, client, _, _, _, _ := connection.GetNextTransaction()
+	return client
+}
+
+func GetTestERC20Contract(client *ethclient.Client, contractAddress string) *contractsgo.TestERC20 {
+	testERC20, err := contractsgo.NewTestERC20(common.HexToAddress(contractAddress), client)
+	if err != nil {
+		log.Fatalf("Failed to instantiate TestERC20 contract: %v", err)
+	}
+	return testERC20
 }
 
 func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.Address, toAddress common.Address, nonce uint64, gasPrice *big.Int, value int64, contractAddress string) {
@@ -42,10 +60,7 @@ func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.
 	auth.GasLimit = gasLimit
 	auth.GasPrice = gasPrice
 
-	testERC20, err := contractsgo.NewTestERC20(common.HexToAddress(contractAddress), client)
-	if err != nil {
-		log.Fatalf("Failed to instantiate TestERC20 contract: %v", err)
-	}
+	testERC20 := GetTestERC20Contract(client, contractAddress)
 
 	fmt.Println("Sender address:", fromAddress.String())
 	fmt.Println("Receiver address:", toAddress.String())
