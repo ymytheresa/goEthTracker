@@ -45,7 +45,7 @@ func deployTestERC20Contract() string {
 	return address.String()
 }
 
-func transferTokens(contractAddress string, toAddress common.Address, value int64) {
+func TransferTokens(contractAddress string, toAddress common.Address, value int64) {
 	_, client, fromAddress, nonce, gasPrice, _ := connection.GetNextTransaction()
 
 	fmt.Println("Transferring TestERC20 tokens...")
@@ -78,8 +78,8 @@ func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.
 
 	fmt.Println("Sender address:", fromAddress.String())
 	fmt.Println("Receiver address:", toAddress.String())
-	fmt.Println("Sender balance before transfer:", getBalance(testERC20, fromAddress))
-	fmt.Println("Receiver balance before transfer:", getBalance(testERC20, toAddress))
+	fmt.Println("Sender balance before transfer:", GetBalance(testERC20, fromAddress))
+	fmt.Println("Receiver balance before transfer:", GetBalance(testERC20, toAddress))
 
 	tx, err := testERC20.Transfer(auth, toAddress, big.NewInt(value))
 	if err != nil {
@@ -92,8 +92,8 @@ func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.
 	}
 	fmt.Printf("Transaction hash: 0x%x\n\n", tx.Hash())
 
-	fmt.Println("Sender balance after transfer:", getBalance(testERC20, fromAddress))
-	fmt.Println("Receiver balance after transfer:", getBalance(testERC20, toAddress))
+	fmt.Println("Sender balance after transfer:", GetBalance(testERC20, fromAddress))
+	fmt.Println("Receiver balance after transfer:", GetBalance(testERC20, toAddress))
 }
 
 func estimateGasForTransfer(client *ethclient.Client, fromAddress common.Address, toAddress common.Address, contractAddress string, value int64) (uint64, error) {
@@ -117,7 +117,7 @@ func estimateGasForTransfer(client *ethclient.Client, fromAddress common.Address
 	return client.EstimateGas(context.Background(), callMsg)
 }
 
-func getBalance(testERC20 *contractsgo.TestERC20, address common.Address) *big.Int {
+func GetBalance(testERC20 *contractsgo.TestERC20, address common.Address) *big.Int {
 	balance, err := testERC20.BalanceOf(&bind.CallOpts{}, address)
 	if err != nil {
 		log.Fatal(err)
@@ -128,5 +128,5 @@ func getBalance(testERC20 *contractsgo.TestERC20, address common.Address) *big.I
 func RunTestERC20Contract() {
 	testERC20ContractAddress := deployTestERC20Contract()
 	toAddress := connection.GenerateNewWallet()
-	transferTokens(testERC20ContractAddress, toAddress, 10)
+	TransferTokens(testERC20ContractAddress, toAddress, 10)
 }
