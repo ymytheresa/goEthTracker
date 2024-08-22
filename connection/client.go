@@ -34,8 +34,6 @@ func Connection() (*ethclient.Client, *big.Int, common.Address, *ecdsa.PrivateKe
 	}
 
 	chainID, err := client.ChainID(context.Background())
-	fmt.Println(chainID)
-	chainID = big.NewInt(1337)
 	if err != nil {
 		log.Fatal(err)
 	}

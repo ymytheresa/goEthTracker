@@ -1,195 +1,104 @@
-# Ethereum-based dApp Development with Go using go-ethereum SDK
+Certainly! Here's a README.md file for your ERC20 Token Monitor CLI project:
 
-## Examples deploying smart contracts on Neon EVM Devnet using Go
+```markdown
+# ERC20 Token Monitor CLI
 
-This directory contains all the files necessary to deploy the following smart contracts on Neon EVM Devnet-
+## Project Overview
 
-1. Simple storage contract.
-2. ERC20 token contract.
+ERC20 Token Monitor CLI is a command-line interface application designed to interact with and monitor ERC20 tokens on a local Ethereum network (Ganache). This tool allows users to deploy ERC20 tokens, transfer tokens between addresses, check balances, and monitor token transactions.
 
-For more details, please refer to these documentations https://goethereumbook.org/en/ and https://geth.ethereum.org/docs/developers/dapp-developer/native-bindings.
+## Features
+
+- Deploy new ERC20 tokens
+- Transfer tokens between addresses
+- Check token balances
+- Monitor token transactions in real-time
+- Subscribe to specific addresses for transaction notifications
+- View transaction history for addresses
+- Display token statistics
+
+## Stage of Development
+
+**Current Stage: Early Development**
+
+This project is in its initial stages of development. The basic structure and core functionalities are being implemented. As of now, the following components are in progress:
+
+- [x] Project structure setup
+- [x] Basic CLI framework
+- [ ] ERC20 token deployment functionality
+- [ ] Token transfer implementation
+- [ ] Balance checking feature
+- [ ] Transaction monitoring system
+- [ ] Address subscription mechanism
+- [ ] Transaction history retrieval
+- [ ] Token statistics display
 
 ## Prerequisites
 
-1. The latest Go version.
-2. Solidity compiler version <= 0.8.25 (Neon EVM supports solidity <= 0.8.26 but Homebrew only supports 0.8.25 for now).
+- Go 1.16 or higher
+- Access to a local Ethereum network (e.g., Ganache)
 
-### Solc installation
+## Installation
 
-Please check this link to install the required solc version - https://docs.soliditylang.org/en/latest/installing-solidity.html.
+1. Clone the repository:
+   ```
+   git clone https://github.com/yourusername/erc20-token-monitor-cli.git
+   ```
 
-### Go installation
+2. Navigate to the project directory:
+   ```
+   cd erc20-token-monitor-cli
+   ```
 
-> [!IMPORTANT]
-> If your machine already has Go installed, then please proceed to the **Cloning repository** step.
+3. Install dependencies:
+   ```
+   go mod tidy
+   ```
 
-1. Download the latest Go version from https://go.dev/doc/install.
+## Usage
 
-2. Create a directory `GoProjects` for your Go project development on your machine. Please run `pwd` inside `GoProjects` directory to get the full path. This will be used in **Step 4** to set the $GOPATH env variable.
+To build the application:
 
-3. Create 3 directories `/GoProjects/src`, `/GoProjects/pkg` and `/GoProjects/bin`.
-
-4. Set up the `$GOPATH` env variable on your machine -
-
-- Run `nano ~/.zshrc` on Mac machines.
-- Run `nano ~/.bash_profile` on Linux machines.
-- Paste the following lines -
-
-```sh
-export GOPATH=<PATH_TO_YOUR_GO_PROJECTS_DIRECTORY>
-export PATH=$GOPATH/bin:$PATH
+```
+go build -o erc20-monitor
 ```
 
-5. Save your `~/.bash_profile` or `~/.zshrc` file.
+Example commands (once implemented):
 
-- Run `source ~/.zshrc` on Mac machines.
-- Run `source ~/.bash_profile` on Linux machines.
+```
+# Deploy a new token
+./erc20-monitor deploy
 
-6. Run `echo $GOPATH` to check if the GOPATH is set correctly in the machine.
+# Transfer tokens
+./erc20-monitor transfer --from 0x123... --to 0x456... --amount 100
 
-> [!IMPORTANT]
-> Neon EVM doesn't support the latest JSON-RPC specifications. Therefore, Neon EVM only supports `go-ethereum` versions **<=1.12.2**.
+# Check balance
+./erc20-monitor balance --address 0x123...
 
-## Cloning repository
+# Start monitoring transactions
+./erc20-monitor monitor
 
-1. Navigate to the `src` directory of your GOPATH.
+# Subscribe to an address
+./erc20-monitor subscribe --address 0x789...
 
-```sh
-cd $GOPATH/src
+# View transaction history
+./erc20-monitor history --address 0x123...
+
+# Display token statistics
+./erc20-monitor stats
 ```
 
-2. Run command
+## Contributing
 
-```sh
-git clone https://github.com/neonlabsorg/goEthTracker.git
-cd goEthTracker
+As this project is in early development, contributions are welcome. Please feel free to submit issues and pull requests.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Disclaimer
+
+This tool is for educational purposes only. Use it at your own risk when interacting with blockchain networks.
 ```
 
-**Note:** All the following commands should be executed inside `goEthTracker` folder.
-
-## Install the required libraries inside the `goEthTracker` folder
-
-```sh
-npm install
-```
-
-```sh
-go install github.com/ethereum/go-ethereum/cmd/abigen@latest
-```
-
-```sh
-go mod tidy
-```
-
-## Set up .env file
-
-Rename `.env.example` to `.env` and place your private key inside it.
-
-## Interact with the **Storage** smart contract
-
-### Generate the go bindings
-
-1. Run the following commands to generate the smart contract ABI and bytecode.
-
-```sh
-solc --abi ./contracts/Storage.sol -o build
-```
-
-```sh
-solc --bin ./contracts/Storage.sol -o build
-```
-
-2. Run the following command to generate the smart contract go binding inside `contractsgo` folder.
-
-```sh
- abigen --abi ./build/Storage.abi --pkg contractsgo --type Storage --out ./contractsgo/Storage.go --bin ./build/Storage.bin
-```
-
-### Run the smart contracts functions
-
-> [!IMPORTANT]
-> To run only the Storage contract, please comment out `deploy.RunTestERC20Contract()` in `main.go`.
-
-Run the following command to deploy the Storage contract, store a value in the deployed smart contract and reading the value from the deployed smart contract.
-
-```sh
-go run main.go
-```
-
-After successfully running this step you should get console output similar to:
-
-```sh
-You are now connected to Neon EVM Devnet
-The NEON balance of the account is: 310387553758242748088682
-------------------------------------------------------------------------
-Deploying Storage contract...
-The contract is deployed at address:  0x6b6Ba862e2bBc0C1305DF681d45f16a1D6F57baf
-Transaction hash: 0xf84667ce0bd5d2da4dfcf81fe9c72bdc81c207a41a3c9baa4c43e9ebb6ae1b6e
-
-You are now connected to Neon EVM Devnet
-The NEON balance of the account is: 310383249542814769793482
-------------------------------------------------------------------------
-Storing value in the Storage contract...
-Estimated gas: 25000
-Transaction hash: 0x24e5af83df1e9f1536d684c08e903d1285f1f5e484df43d4616c925bb25ec9a9
-
-You are now connected to Neon EVM Devnet
-The NEON balance of the account is: 310383247282862115123482
-------------------------------------------------------------------------
-Reading value from the Storage contract...
-Returned value: 45
-```
-
-## Interact with the **TestERC20** smart contract
-
-### Generate the go bindings
-
-1. Run the following commands to generate the smart contract ABI and bytecode.
-
-```sh
-solc --abi ./contracts/TestERC20.sol -o build
-```
-
-```sh
-solc --bin ./contracts/TestERC20.sol -o build
-```
-
-2. Run the following command to generate the smart contract go binding inside `contractsgo` folder.
-
-```sh
- abigen --abi ./build/TestERC20.abi --pkg contractsgo --type TestERC20 --out ./contractsgo/TestERC20.go --bin ./build/TestERC20.bin
-```
-
-### Run the smart contracts functions
-
-> [!IMPORTANT]
-> To run only the TestERC20 contract, please comment out `deploy.RunStorageContract()` in `main.go`.
-
-Run the following command to deploy the TestERC20 contract and transfer some TestERC20 tokens from the deployer address to a randomly created address
-
-```sh
-go run main.go
-```
-
-After successfully running this step you should get console output similar to:
-
-```sh
-You are now connected to Neon EVM Devnet
-The NEON balance of the account is: 310383247282862115123482
-------------------------------------------------------------------------
-Deploying TestERC20 contract...
-The contract is deployed at address:  0x7BeE8180c4f35744C9cC811e540252ECcD8AcEb4
-Transaction hash: 0xf8af65bcb8187bcdcc8c7a5a7106f242c941d6506201497f31f46099d891bcc6
-
-You are now connected to Neon EVM Devnet
-The NEON balance of the account is: 310373551028315738437922
-------------------------------------------------------------------------
-Transferring TestERC20 tokens...
-Estimated gas: 1422000
-Sender balance before transfer: 1000000000000000000000
-Receiver balance before transfer: 0
-Transaction hash: 0x8d2ff2a94f836b25e3ae9cc2f9b95ca73e3b3c1e4a6bf7725890eddd915029ab
-
-Sender balance after transfer: 999999999999999999990
-Receiver balance after transfer: 10
-```
+This README provides an overview of the project, its current stage of development, and basic usage instructions. It also includes sections for prerequisites, installation, and contribution guidelines. As you progress with the development, you can update the README to reflect new features and changes in the project status.
