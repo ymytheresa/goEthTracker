@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"sync"
 
 	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/connection"
 	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/contractsgo"
@@ -16,24 +17,45 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-func TransferTokens(contractAddress string, toAddress common.Address, value int64) {
+var (
+	testERC20Contract *contractsgo.TestERC20
+	testERC20Mu       sync.Mutex
+)
+
+func TransferTokens(contractAddress string, toAddress common.Address, value int64) (string, error) {
 	_, client, fromAddress, nonce, gasPrice, _ := connection.GetNextTransaction()
 
 	fmt.Println("Transferring TestERC20 tokens...")
-
-	transferTokensWithGasEstimate(client, fromAddress, toAddress, nonce, gasPrice, value, contractAddress)
+	txHash, err := transferTokensWithGasEstimate(client, fromAddress, toAddress, nonce, gasPrice, value, contractAddress)
+	if err != nil {
+		return "", err
+	}
+	return txHash.Hex(), nil
 }
 
-func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.Address, toAddress common.Address, nonce uint64, gasPrice *big.Int, value int64, contractAddress string) {
+func GetClient() *ethclient.Client {
+	_, client, _, _, _, _ := connection.GetNextTransaction()
+	return client
+}
+
+func GetTestERC20Contract(client *ethclient.Client, contractAddress string) *contractsgo.TestERC20 {
+	testERC20, err := contractsgo.NewTestERC20(common.HexToAddress(contractAddress), client)
+	if err != nil {
+		log.Fatalf("Failed to instantiate TestERC20 contract: %v", err)
+	}
+	return testERC20
+}
+
+func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.Address, toAddress common.Address, nonce uint64, gasPrice *big.Int, value int64, contractAddress string) (common.Hash, error) {
 	gasLimit, err := estimateGasForTransfer(client, fromAddress, toAddress, contractAddress, value)
 	if err != nil {
-		log.Fatal(err)
+		return common.Hash{}, err
 	}
 	fmt.Println("Estimated gas:", gasLimit)
 
 	auth, _, _, _, _, err := connection.GetNextTransaction()
 	if err != nil {
-		log.Fatal(err)
+		return common.Hash{}, err
 	}
 
 	auth.From = fromAddress
@@ -42,29 +64,31 @@ func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.
 	auth.GasLimit = gasLimit
 	auth.GasPrice = gasPrice
 
-	testERC20, err := contractsgo.NewTestERC20(common.HexToAddress(contractAddress), client)
-	if err != nil {
-		log.Fatalf("Failed to instantiate TestERC20 contract: %v", err)
-	}
+	testERC20 := GetTestERC20Contract(client, contractAddress)
+	contractAddressObj := common.HexToAddress(contractAddress)
 
-	fmt.Println("Sender address:", fromAddress.String())
-	fmt.Println("Receiver address:", toAddress.String())
-	fmt.Println("Sender balance before transfer:", GetBalance(testERC20, fromAddress))
-	fmt.Println("Receiver balance before transfer:", GetBalance(testERC20, toAddress))
+	fmt.Println("\nBefore Transfer:")
+	printAddressDetails(client, testERC20, "Contract", contractAddressObj)
+	printAddressDetails(client, testERC20, "Sender", fromAddress)
+	printAddressDetails(client, testERC20, "Receiver", toAddress)
 
 	tx, err := testERC20.Transfer(auth, toAddress, big.NewInt(value))
 	if err != nil {
-		log.Fatalf("Failed to transfer tokens: %v", err)
+		return common.Hash{}, fmt.Errorf("failed to transfer tokens: %v", err)
 	}
 
 	_, err = bind.WaitMined(context.Background(), client, tx)
 	if err != nil {
-		log.Fatal(err)
+		return common.Hash{}, err
 	}
-	fmt.Printf("Transaction hash: 0x%x\n\n", tx.Hash())
+	fmt.Printf("\nTransaction hash: 0x%x\n", tx.Hash())
 
-	fmt.Println("Sender balance after transfer:", GetBalance(testERC20, fromAddress))
-	fmt.Println("Receiver balance after transfer:", GetBalance(testERC20, toAddress))
+	fmt.Println("\nAfter Transfer:")
+	printAddressDetails(client, testERC20, "Contract", contractAddressObj)
+	printAddressDetails(client, testERC20, "Sender", fromAddress)
+	printAddressDetails(client, testERC20, "Receiver", toAddress)
+
+	return tx.Hash(), nil
 }
 
 func estimateGasForTransfer(client *ethclient.Client, fromAddress common.Address, toAddress common.Address, contractAddress string, value int64) (uint64, error) {
@@ -94,4 +118,22 @@ func GetBalance(testERC20 *contractsgo.TestERC20, address common.Address) *big.I
 		log.Fatal(err)
 	}
 	return balance
+}
+
+func printAddressDetails(client *ethclient.Client, testERC20 *contractsgo.TestERC20, label string, address common.Address) {
+	ethBalance, err := client.BalanceAt(context.Background(), address, nil)
+	if err != nil {
+		log.Printf("Failed to get ETH balance for %s: %v", label, err)
+		return
+	}
+
+	tokenBalance, err := testERC20.BalanceOf(&bind.CallOpts{}, address)
+	if err != nil {
+		log.Printf("Failed to get token balance for %s: %v", label, err)
+		return
+	}
+
+	fmt.Printf("%s Address: %s\n", label, address.Hex())
+	fmt.Printf("%s ETH Balance: %s wei\n", label, ethBalance.String())
+	fmt.Printf("%s Token Balance: %s\n\n", label, tokenBalance.String())
 }

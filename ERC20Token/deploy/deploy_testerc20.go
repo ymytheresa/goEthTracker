@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"os"
+	"path/filepath"
 
 	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/connection"
 	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/contractsgo"
@@ -38,6 +40,16 @@ func deployTestERC20Contract() string {
 
 	fmt.Println("The contract is deployed at address: ", address)
 	fmt.Printf("Transaction hash: 0x%x\n\n", tx.Hash())
+
+	// Write address to file
+	rootDir := filepath.Join("./") // Adjust this based on your project structure
+	filePath := filepath.Join(rootDir, "contract_address.txt")
+	err = os.WriteFile(filePath, []byte(address.String()), 0644)
+	if err != nil {
+		log.Fatalf("Failed to write contract address: %v", err)
+	}
+
+	fmt.Printf("Contract address saved to: %s\n", filePath)
 
 	return address.String()
 }
