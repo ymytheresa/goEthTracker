@@ -45,9 +45,8 @@ func deployTestERC20Contract() string {
 	return address.String()
 }
 
-func transferTokens(contractAddress string, value int64) {
+func transferTokens(contractAddress string, toAddress common.Address, value int64) {
 	_, client, fromAddress, nonce, gasPrice, _ := connection.GetNextTransaction()
-	toAddress := connection.GenerateNewWallet()
 
 	fmt.Println("Transferring TestERC20 tokens...")
 
@@ -77,6 +76,8 @@ func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.
 		log.Fatalf("Failed to instantiate TestERC20 contract: %v", err)
 	}
 
+	fmt.Println("Sender address:", fromAddress.String())
+	fmt.Println("Receiver address:", toAddress.String())
 	fmt.Println("Sender balance before transfer:", getBalance(testERC20, fromAddress))
 	fmt.Println("Receiver balance before transfer:", getBalance(testERC20, toAddress))
 
@@ -126,5 +127,6 @@ func getBalance(testERC20 *contractsgo.TestERC20, address common.Address) *big.I
 
 func RunTestERC20Contract() {
 	testERC20ContractAddress := deployTestERC20Contract()
-	transferTokens(testERC20ContractAddress, 10)
+	toAddress := connection.GenerateNewWallet()
+	transferTokens(testERC20ContractAddress, toAddress, 10)
 }
