@@ -93,6 +93,7 @@ Total Sums:
 ## Note
 
 This tool is designed for educational and testing purposes on a local Ethereum network. Always exercise caution when dealing with real cryptocurrencies and tokens.
+Test cases not added yet. will add
 
 ## Contributing
 
