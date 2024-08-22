@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 func deployTestERC20Contract() string {
@@ -45,37 +46,24 @@ func deployTestERC20Contract() string {
 }
 
 func transferTokens(contractAddress string, value int64) {
-	auth, client, fromAddress, nonce, gasPrice, _ := connection.GetNextTransaction()
+	_, client, fromAddress, nonce, gasPrice, _ := connection.GetNextTransaction()
 	toAddress := connection.GenerateNewWallet()
 
 	fmt.Println("Transferring TestERC20 tokens...")
 
-	store := abi.MustParseMethod("transfer(address,uint256)")
-	// Encode method arguments.
-	abiData, err := store.EncodeArgs(toAddress, big.NewInt(value))
-	if err != nil {
-		panic(err)
-	}
+	transferTokensWithGasEstimate(client, fromAddress, toAddress, nonce, gasPrice, value, contractAddress)
+}
 
-	toContractAddress := common.HexToAddress(contractAddress)
-
-	callMsg := ethereum.CallMsg{
-		From:     fromAddress,
-		To:       &toContractAddress,
-		GasPrice: gasPrice,
-		Value:    big.NewInt(0),
-		Data:     abiData,
-	}
-
-	gasLimit, err := client.EstimateGas(context.Background(), callMsg)
+func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.Address, toAddress common.Address, nonce uint64, gasPrice *big.Int, value int64, contractAddress string) {
+	gasLimit, err := estimateGasForTransfer(client, fromAddress, toAddress, contractAddress, value)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("Estimated gas:", gasLimit)
 
-	testERC20, err := contractsgo.NewTestERC20(common.HexToAddress(contractAddress), client)
+	auth, _, _, _, _, err := connection.GetNextTransaction()
 	if err != nil {
-		log.Fatalf("Failed to instantiate TestERC20 contract: %v", err)
+		log.Fatal(err)
 	}
 
 	auth.From = fromAddress
@@ -84,13 +72,14 @@ func transferTokens(contractAddress string, value int64) {
 	auth.GasLimit = gasLimit
 	auth.GasPrice = gasPrice
 
-	testERC20BalanceOfSender, _ := testERC20.BalanceOf(&bind.CallOpts{}, fromAddress)
-	fmt.Println("Sender balance before transfer:", testERC20BalanceOfSender)
+	testERC20, err := contractsgo.NewTestERC20(common.HexToAddress(contractAddress), client)
+	if err != nil {
+		log.Fatalf("Failed to instantiate TestERC20 contract: %v", err)
+	}
 
-	testERC20BalanceOfReceiver, _ := testERC20.BalanceOf(&bind.CallOpts{}, toAddress)
-	fmt.Println("Receiver balance before transfer:", testERC20BalanceOfReceiver)
+	fmt.Println("Sender balance before transfer:", getBalance(testERC20, fromAddress))
+	fmt.Println("Receiver balance before transfer:", getBalance(testERC20, toAddress))
 
-	// Call the transfer function from the smart contract
 	tx, err := testERC20.Transfer(auth, toAddress, big.NewInt(value))
 	if err != nil {
 		log.Fatalf("Failed to transfer tokens: %v", err)
@@ -102,11 +91,37 @@ func transferTokens(contractAddress string, value int64) {
 	}
 	fmt.Printf("Transaction hash: 0x%x\n\n", tx.Hash())
 
-	testERC20BalanceOfSender, _ = testERC20.BalanceOf(&bind.CallOpts{}, fromAddress)
-	fmt.Println("Sender balance after transfer:", testERC20BalanceOfSender)
+	fmt.Println("Sender balance after transfer:", getBalance(testERC20, fromAddress))
+	fmt.Println("Receiver balance after transfer:", getBalance(testERC20, toAddress))
+}
 
-	testERC20BalanceOfReceiver, _ = testERC20.BalanceOf(&bind.CallOpts{}, toAddress)
-	fmt.Println("Receiver balance after transfer:", testERC20BalanceOfReceiver)
+func estimateGasForTransfer(client *ethclient.Client, fromAddress common.Address, toAddress common.Address, contractAddress string, value int64) (uint64, error) {
+	store := abi.MustParseMethod("transfer(address,uint256)")
+	// Encode method arguments.
+	abiData, err := store.EncodeArgs(toAddress, big.NewInt(value))
+	if err != nil {
+		return 0, err
+	}
+
+	toContractAddress := common.HexToAddress(contractAddress)
+
+	callMsg := ethereum.CallMsg{
+		From:     fromAddress,
+		To:       &toContractAddress,
+		GasPrice: nil,
+		Value:    big.NewInt(0),
+		Data:     abiData,
+	}
+
+	return client.EstimateGas(context.Background(), callMsg)
+}
+
+func getBalance(testERC20 *contractsgo.TestERC20, address common.Address) *big.Int {
+	balance, err := testERC20.BalanceOf(&bind.CallOpts{}, address)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return balance
 }
 
 func RunTestERC20Contract() {
