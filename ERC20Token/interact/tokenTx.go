@@ -61,11 +61,12 @@ func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.
 	auth.GasPrice = gasPrice
 
 	testERC20 := GetTestERC20Contract(client, contractAddress)
+	contractAddressObj := common.HexToAddress(contractAddress)
 
-	fmt.Println("Sender address:", fromAddress.String())
-	fmt.Println("Receiver address:", toAddress.String())
-	fmt.Println("Sender balance before transfer:", GetBalance(testERC20, fromAddress))
-	fmt.Println("Receiver balance before transfer:", GetBalance(testERC20, toAddress))
+	fmt.Println("\nBefore Transfer:")
+	printAddressDetails(client, testERC20, "Contract", contractAddressObj)
+	printAddressDetails(client, testERC20, "Sender", fromAddress)
+	printAddressDetails(client, testERC20, "Receiver", toAddress)
 
 	tx, err := testERC20.Transfer(auth, toAddress, big.NewInt(value))
 	if err != nil {
@@ -76,10 +77,12 @@ func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Transaction hash: 0x%x\n\n", tx.Hash())
+	fmt.Printf("\nTransaction hash: 0x%x\n", tx.Hash())
 
-	fmt.Println("Sender balance after transfer:", GetBalance(testERC20, fromAddress))
-	fmt.Println("Receiver balance after transfer:", GetBalance(testERC20, toAddress))
+	fmt.Println("\nAfter Transfer:")
+	printAddressDetails(client, testERC20, "Contract", contractAddressObj)
+	printAddressDetails(client, testERC20, "Sender", fromAddress)
+	printAddressDetails(client, testERC20, "Receiver", toAddress)
 }
 
 func estimateGasForTransfer(client *ethclient.Client, fromAddress common.Address, toAddress common.Address, contractAddress string, value int64) (uint64, error) {
@@ -109,4 +112,22 @@ func GetBalance(testERC20 *contractsgo.TestERC20, address common.Address) *big.I
 		log.Fatal(err)
 	}
 	return balance
+}
+
+func printAddressDetails(client *ethclient.Client, testERC20 *contractsgo.TestERC20, label string, address common.Address) {
+	ethBalance, err := client.BalanceAt(context.Background(), address, nil)
+	if err != nil {
+		log.Printf("Failed to get ETH balance for %s: %v", label, err)
+		return
+	}
+
+	tokenBalance, err := testERC20.BalanceOf(&bind.CallOpts{}, address)
+	if err != nil {
+		log.Printf("Failed to get token balance for %s: %v", label, err)
+		return
+	}
+
+	fmt.Printf("%s Address: %s\n", label, address.Hex())
+	fmt.Printf("%s ETH Balance: %s wei\n", label, ethBalance.String())
+	fmt.Printf("%s Token Balance: %s\n\n", label, tokenBalance.String())
 }

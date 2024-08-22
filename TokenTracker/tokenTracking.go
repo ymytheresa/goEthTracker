@@ -30,6 +30,7 @@ type TokenTracker struct {
 	contract            *contractsgo.TestERC20
 	client              *ethclient.Client
 	contractAddress     common.Address
+	ownerAddress        common.Address
 	transfers           []TransferEvent
 	totalTransferredOut *big.Int
 }
@@ -40,9 +41,15 @@ func setTokenTracker() TokenTracker {
 		log.Fatal(err)
 	}
 
+	ownerAddress, err := GetOwnerAddress()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return TokenTracker{
 		client:              interact.GetClient(),
 		contractAddress:     contractAddress,
+		ownerAddress:        ownerAddress,
 		transfers:           []TransferEvent{},
 		totalTransferredOut: big.NewInt(0),
 	}
@@ -51,7 +58,7 @@ func setTokenTracker() TokenTracker {
 // StartTracking begins listening for Transfer events
 func (t *TokenTracker) StartTracking() error {
 	query := ethereum.FilterQuery{
-		Addresses: []common.Address{t.contractAddress},
+		Addresses: []common.Address{t.contractAddress, t.ownerAddress},
 	}
 
 	logs := make(chan types.Log)
@@ -115,13 +122,23 @@ func GetContractAddress() (common.Address, error) {
 	return common.HexToAddress(addressString), nil
 }
 
+func GetOwnerAddress() (common.Address, error) {
+	filePath := "./owner_address.txt"
+	addressBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return common.Address{}, err
+	}
+	addressString := string(addressBytes)
+	return common.HexToAddress(addressString), nil
+}
+
 func (t *TokenTracker) MonitorContractTransfers(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for range ticker.C {
 		t.updateTotalTransferredOut()
-		fmt.Printf("Total amount transferred from contract: %s\n", t.totalTransferredOut.String())
+		fmt.Printf("Total amount transferred from owner: %s\n", t.totalTransferredOut.String())
 	}
 }
 
@@ -135,9 +152,9 @@ func (t *TokenTracker) updateTotalTransferredOut() {
 		}
 	}
 
-	currentBalance, err := t.contract.BalanceOf(&bind.CallOpts{}, t.contractAddress)
+	ownerBalance, err := t.contract.BalanceOf(&bind.CallOpts{}, t.ownerAddress)
 	if err != nil {
-		log.Printf("Failed to get contract balance: %v", err)
+		log.Printf("Failed to get owner balance: %v", err)
 		return
 	}
 
@@ -147,5 +164,26 @@ func (t *TokenTracker) updateTotalTransferredOut() {
 		return
 	}
 
-	t.totalTransferredOut = new(big.Int).Sub(totalSupply, currentBalance)
+	t.totalTransferredOut = new(big.Int).Sub(totalSupply, ownerBalance)
+
+	fmt.Println("\nContract and Owner Details:")
+	fmt.Printf("Contract Address: %s\n", t.contractAddress.Hex())
+	fmt.Printf("Owner Address: %s\n", t.ownerAddress.Hex())
+	fmt.Printf("Owner Balance: %s\n", ownerBalance.String())
+	fmt.Printf("Total Supply: %s\n", totalSupply.String())
+	fmt.Printf("Total Transferred Out: %s\n", t.totalTransferredOut.String())
+
+	fmt.Println("\nRecent Transfers from Owner:")
+	transferCount := 0
+	for i := len(t.transfers) - 1; i >= 0 && transferCount < 5; i-- {
+		event := t.transfers[i]
+		if event.From == t.ownerAddress.Hex() {
+			fmt.Printf("To: %s, Amount: %s\n", event.To, event.Value)
+			transferCount++
+		}
+	}
+
+	if transferCount == 0 {
+		fmt.Println("No recent transfers from owner")
+	}
 }
