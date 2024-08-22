@@ -123,13 +123,12 @@ func updateMaps(events []TransferEvent) {
 	defer mapMutex.Unlock()
 
 	for _, event := range events {
-		// Update intervalSums
+
 		if _, exists := intervalSums[event.To]; !exists {
 			intervalSums[event.To] = big.NewInt(0)
 		}
 		intervalSums[event.To].Add(intervalSums[event.To], event.Value)
 
-		// Update totalSums
 		if _, exists := totalSums[event.To]; !exists {
 			totalSums[event.To] = big.NewInt(0)
 		}

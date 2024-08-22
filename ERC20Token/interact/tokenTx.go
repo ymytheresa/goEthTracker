@@ -93,7 +93,7 @@ func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.
 
 func estimateGasForTransfer(client *ethclient.Client, fromAddress common.Address, toAddress common.Address, contractAddress string, value int64) (uint64, error) {
 	store := abi.MustParseMethod("transfer(address,uint256)")
-	// Encode method arguments.
+
 	abiData, err := store.EncodeArgs(toAddress, big.NewInt(value))
 	if err != nil {
 		return 0, err
