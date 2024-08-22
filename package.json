@@ -1,5 +1,5 @@
 {
-  "name": "go-ethereum-tutorial",
+  "name": "goEthTracker",
   "version": "1.0.0",
   "description": "# Examples deploying smart contracts on Neon EVM Devnet using Go",
   "main": "index.js",

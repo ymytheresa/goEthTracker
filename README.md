@@ -61,13 +61,13 @@ cd $GOPATH/src
 2. Run command
 
 ```sh
-git clone https://github.com/neonlabsorg/go-ethereum-tutorial.git
-cd go-ethereum-tutorial
+git clone https://github.com/neonlabsorg/goEthTracker.git
+cd goEthTracker
 ```
 
-**Note:** All the following commands should be executed inside `go-ethereum-tutorial` folder.
+**Note:** All the following commands should be executed inside `goEthTracker` folder.
 
-## Install the required libraries inside the `go-ethereum-tutorial` folder
+## Install the required libraries inside the `goEthTracker` folder
 
 ```sh
 npm install

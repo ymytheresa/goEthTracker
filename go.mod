@@ -1,4 +1,4 @@
-module go-ethereum-tutorial
+module goEthTracker
 
 go 1.22.2
 

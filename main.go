@@ -1,10 +1,10 @@
 package main
 
-import "go-ethereum-tutorial/deploy"
+import "goEthTracker/deploy"
 
 func main() {
 	// Storage contract
-	deploy.RunStorageContract()
+	// deploy.RunStorageContract()
 
 	// TestERC20 contract
 	deploy.RunTestERC20Contract()

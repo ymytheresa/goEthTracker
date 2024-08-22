@@ -6,8 +6,8 @@ import (
 	"log"
 	"math/big"
 
-	"go-ethereum-tutorial/connection"
-	"go-ethereum-tutorial/contractsgo"
+	"goEthTracker/connection"
+	"goEthTracker/contractsgo"
 
 	"github.com/defiweb/go-eth/abi"
 	"github.com/ethereum/go-ethereum"
@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-func deployStorageContract() (string) {
+func deployStorageContract() string {
 	auth, client, fromAddress, nonce, gasPrice, _ := connection.GetNextTransaction()
 
 	fmt.Println("Deploying Storage contract...")
@@ -27,16 +27,16 @@ func deployStorageContract() (string) {
 	auth.GasPrice = gasPrice
 
 	address, tx, _, err := contractsgo.DeployStorage(auth, client)
-    if err != nil {
-        log.Fatal(err)
-    }
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	_, err = bind.WaitDeployed(context.Background(), client, tx)
-    if err != nil {
-        log.Fatal(err)
-    }
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    fmt.Println("The contract is deployed at address: ", address)
+	fmt.Println("The contract is deployed at address: ", address)
 	fmt.Printf("Transaction hash: 0x%x\n\n", tx.Hash())
 
 	return address.String()
@@ -57,18 +57,18 @@ func storeValue(contractAddress string, value int64) {
 
 	toContractAddress := common.HexToAddress(contractAddress)
 
-	callMsg := ethereum.CallMsg {
-		From: fromAddress,
-		To: &toContractAddress,
+	callMsg := ethereum.CallMsg{
+		From:     fromAddress,
+		To:       &toContractAddress,
 		GasPrice: gasPrice,
-        Value: big.NewInt(0),
-		Data: abiData,
+		Value:    big.NewInt(0),
+		Data:     abiData,
 	}
 
 	gasLimit, err := client.EstimateGas(context.Background(), callMsg) // nil is latest block
-    if err != nil {
-        log.Fatal(err)
-    }
+	if err != nil {
+		log.Fatal(err)
+	}
 	fmt.Println("Estimated gas:", gasLimit)
 
 	storage, err := contractsgo.NewStorage(common.HexToAddress(contractAddress), client)
@@ -87,12 +87,12 @@ func storeValue(contractAddress string, value int64) {
 	if err != nil {
 		log.Fatalf("Failed to update value: %v", err)
 	}
-	
+
 	_, err = bind.WaitMined(context.Background(), client, tx)
-    if err != nil {
-        log.Fatal(err)
-    }
-	fmt.Printf("Transaction hash: 0x%x\n\n", tx.Hash())	
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Transaction hash: 0x%x\n\n", tx.Hash())
 }
 
 func readValue(contractAddress string) {
