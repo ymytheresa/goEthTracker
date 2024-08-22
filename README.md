@@ -99,6 +99,4 @@ Test cases not added yet. will add
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## License
 
-[Insert your chosen license here]
