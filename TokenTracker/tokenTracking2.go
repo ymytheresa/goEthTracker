@@ -6,21 +6,19 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/contractsgo"
-	// Import your contract ABI package here
+	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/interact"
 )
 
 var (
 	hashFilePath = "hash.txt"
 	mutex        sync.Mutex
+	intervalSums = make(map[common.Address]*big.Int)
+	totalSums    = make(map[common.Address]*big.Int)
+	mapMutex     sync.Mutex
 )
 
 type TransferEvent struct {
@@ -43,6 +41,8 @@ func startTicker() {
 			if err != nil {
 				fmt.Printf("Error processing transactions: %v\n", err)
 			}
+			printMaps()
+			resetIntervalSums()
 		}
 	}
 }
@@ -61,7 +61,13 @@ func processTransactions() error {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		txHash := scanner.Text()
-		printEventForHash(txHash)
+		events, err := getEventsForHash(txHash)
+		if err != nil {
+			fmt.Printf("Error getting events for hash %s: %v\n", txHash, err)
+			continue
+		}
+		// printEvents(events)
+		updateMaps(events)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -74,45 +80,82 @@ func processTransactions() error {
 	return nil
 }
 
-func printEventForHash(txHash string) {
-	client, err := ethclient.Dial("http://localhost:8545") // Connect to your local Ganache
+func getEventsForHash(txHash string) ([]TransferEvent, error) {
+	hash := common.HexToHash(txHash)
+	client := interact.GetClient()
+	receipt, err := client.TransactionReceipt(context.Background(), hash)
 	if err != nil {
-		fmt.Printf("Error connecting to Ganache: %v\n", err)
-		return
-	}
-	defer client.Close()
-
-	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(txHash))
-	if err != nil {
-		fmt.Printf("Error getting transaction receipt for %s: %v\n", txHash, err)
-		return
+		return nil, fmt.Errorf("error getting transaction receipt: %v", err)
 	}
 
-	contractABI, err := abi.JSON(strings.NewReader(contractsgo.TestERC20ABI))
-	if err != nil {
-		fmt.Printf("Error parsing contract ABI: %v\n", err)
-		return
-	}
-
-	fmt.Printf("Events for transaction %s:\n", txHash)
+	var events []TransferEvent
 	for _, log := range receipt.Logs {
-		event, err := parseTransferEvent(contractABI, *log)
-		if err != nil {
-			fmt.Printf("Error parsing event: %v\n", err)
-			continue
+		if len(log.Topics) == 3 && log.Topics[0] == common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef") {
+			from := common.HexToAddress(log.Topics[1].Hex())
+			to := common.HexToAddress(log.Topics[2].Hex())
+			value := new(big.Int).SetBytes(log.Data)
+
+			event := TransferEvent{
+				From:   from,
+				To:     to,
+				Value:  value,
+				TxHash: hash,
+			}
+			events = append(events, event)
 		}
-		fmt.Printf("Transfer: From %s To %s Amount %s\n", event.From, event.To, event.Value)
+	}
+
+	return events, nil
+}
+
+func printEvents(events []TransferEvent) {
+	for _, event := range events {
+		fmt.Printf("Transaction Hash: %s\n", event.TxHash.Hex())
+		fmt.Printf("From: %s\n", event.From.Hex())
+		fmt.Printf("To: %s\n", event.To.Hex())
+		fmt.Printf("Value: %s\n", event.Value.String())
+		fmt.Println("------------------------")
 	}
 }
 
-func parseTransferEvent(contractABI abi.ABI, log types.Log) (TransferEvent, error) {
-	event := TransferEvent{}
-	err := contractABI.UnpackIntoInterface(&event, "Transfer", log.Data)
-	if err != nil {
-		return event, err
+func updateMaps(events []TransferEvent) {
+	mapMutex.Lock()
+	defer mapMutex.Unlock()
+
+	for _, event := range events {
+		// Update intervalSums
+		if _, exists := intervalSums[event.To]; !exists {
+			intervalSums[event.To] = big.NewInt(0)
+		}
+		intervalSums[event.To].Add(intervalSums[event.To], event.Value)
+
+		// Update totalSums
+		if _, exists := totalSums[event.To]; !exists {
+			totalSums[event.To] = big.NewInt(0)
+		}
+		totalSums[event.To].Add(totalSums[event.To], event.Value)
 	}
-	event.From = common.HexToAddress(log.Topics[1].Hex())
-	event.To = common.HexToAddress(log.Topics[2].Hex())
-	event.TxHash = log.TxHash
-	return event, nil
+}
+
+func printMaps() {
+	mapMutex.Lock()
+	defer mapMutex.Unlock()
+
+	fmt.Println("Interval Sums:")
+	for addr, sum := range intervalSums {
+		fmt.Printf("%s: %s\n", addr.Hex(), sum.String())
+	}
+
+	fmt.Println("\nTotal Sums:")
+	for addr, sum := range totalSums {
+		fmt.Printf("%s: %s\n", addr.Hex(), sum.String())
+	}
+	fmt.Println()
+}
+
+func resetIntervalSums() {
+	mapMutex.Lock()
+	defer mapMutex.Unlock()
+
+	intervalSums = make(map[common.Address]*big.Int)
 }
