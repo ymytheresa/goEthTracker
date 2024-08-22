@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/big"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -28,14 +27,12 @@ type TransferEvent struct {
 
 // TokenTracker handles the tracking of ERC20 token events
 type TokenTracker struct {
-	contract                *contractsgo.TestERC20
-	client                  *ethclient.Client
-	contractAddress         common.Address
-	ownerAddress            common.Address
-	transfers               []TransferEvent
-	totalTransferredOut     *big.Int
-	receiverBalances        map[string]*big.Int
-	currentIntervalBalances map[string]*big.Int
+	contract            *contractsgo.TestERC20
+	client              *ethclient.Client
+	contractAddress     common.Address
+	ownerAddress        common.Address
+	transfers           []TransferEvent
+	totalTransferredOut *big.Int
 }
 
 func setTokenTracker() TokenTracker {
@@ -50,13 +47,11 @@ func setTokenTracker() TokenTracker {
 	}
 
 	return TokenTracker{
-		client:                  interact.GetClient(),
-		contractAddress:         contractAddress,
-		ownerAddress:            ownerAddress,
-		transfers:               []TransferEvent{},
-		totalTransferredOut:     big.NewInt(0),
-		receiverBalances:        make(map[string]*big.Int),
-		currentIntervalBalances: make(map[string]*big.Int),
+		client:              interact.GetClient(),
+		contractAddress:     contractAddress,
+		ownerAddress:        ownerAddress,
+		transfers:           []TransferEvent{},
+		totalTransferredOut: big.NewInt(0),
 	}
 }
 
@@ -109,29 +104,6 @@ func (t *TokenTracker) parseTransferEvent(vLog types.Log) (TransferEvent, error)
 	event.To = transferEvent.To.Hex()
 	event.Value = transferEvent.Value.String()
 
-	value := new(big.Int)
-	value, ok := value.SetString(event.Value, 10)
-	if !ok {
-		return event, fmt.Errorf("failed to parse transfer value: %s", event.Value)
-	}
-
-	// Update totalTransferredOut, receiverBalances, and currentIntervalBalances if the transfer is from the owner
-	if event.From == t.ownerAddress.Hex() {
-		t.totalTransferredOut = new(big.Int).Add(t.totalTransferredOut, value)
-
-		if existingBalance, ok := t.receiverBalances[event.To]; ok {
-			t.receiverBalances[event.To] = new(big.Int).Add(existingBalance, value)
-		} else {
-			t.receiverBalances[event.To] = new(big.Int).Set(value)
-		}
-
-		if existingBalance, ok := t.currentIntervalBalances[event.To]; ok {
-			t.currentIntervalBalances[event.To] = new(big.Int).Add(existingBalance, value)
-		} else {
-			t.currentIntervalBalances[event.To] = new(big.Int).Set(value)
-		}
-	}
-
 	return event, nil
 }
 
@@ -166,28 +138,7 @@ func (t *TokenTracker) MonitorContractTransfers(interval time.Duration) {
 
 	for range ticker.C {
 		t.updateTotalTransferredOut()
-
-		fmt.Println("\nContract and Owner Details:")
-		fmt.Printf("Contract Address: %s\n", t.contractAddress.Hex())
-		fmt.Printf("Owner Address: %s\n", t.ownerAddress.Hex())
-		fmt.Printf("Total Sent Amount: %s\n", t.totalTransferredOut.String())
-
-		fmt.Println("\nTransfers during this interval:")
-		t.printTransferTable(t.currentIntervalBalances)
-
-		fmt.Println("\nTotal transfers since monitoring started:")
-		t.printTransferTable(t.receiverBalances)
-
-		// Reset the current interval balances
-		t.currentIntervalBalances = make(map[string]*big.Int)
-	}
-}
-
-func (t *TokenTracker) printTransferTable(balances map[string]*big.Int) {
-	fmt.Printf("%-42s | %-18s\n", "Receiver Address", "Amount Received")
-	fmt.Println(strings.Repeat("-", 63))
-	for addr, amount := range balances {
-		fmt.Printf("%-42s | %-18s\n", addr, amount.String())
+		fmt.Printf("Total amount transferred from owner: %s\n", t.totalTransferredOut.String())
 	}
 }
 
@@ -212,6 +163,8 @@ func (t *TokenTracker) updateTotalTransferredOut() {
 		log.Printf("Failed to get total supply: %v", err)
 		return
 	}
+
+	t.totalTransferredOut = new(big.Int).Sub(totalSupply, ownerBalance)
 
 	fmt.Println("\nContract and Owner Details:")
 	fmt.Printf("Contract Address: %s\n", t.contractAddress.Hex())
