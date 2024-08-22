@@ -5,13 +5,21 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/gofrs/flock"
 	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/interact"
 )
 
 var randomAddresses []common.Address
+var fileLock *flock.Flock
+var mutex sync.Mutex
+
+func init() {
+	fileLock = flock.New("hash.txt")
+}
 
 func RandomTransaction(interval time.Duration, done chan bool) {
 	numberOfRandomAddresses := 10
@@ -32,7 +40,10 @@ func RandomTransaction(interval time.Duration, done chan bool) {
 		for {
 			select {
 			case <-ticker.C:
-				transact(contractAddr, randomAddresses)
+				txHash := transact(contractAddr, randomAddresses)
+				if err := writeTransactionHash(txHash); err != nil {
+					log.Printf("Error writing transaction hash: %v", err)
+				}
 			case <-done:
 				return
 			}
@@ -40,8 +51,44 @@ func RandomTransaction(interval time.Duration, done chan bool) {
 	}()
 }
 
-func transact(contractAddr string, randomAddresses []common.Address) {
-	interact.TransferTokens(contractAddr, randomAddresses[rand.Intn(len(randomAddresses))], int64(rand.Intn(100)))
+func transact(contractAddr string, randomAddresses []common.Address) string {
+	recipient := randomAddresses[rand.Intn(len(randomAddresses))]
+	txHash, err := interact.TransferTokens(contractAddr, recipient, int64(rand.Intn(100)))
+	if err != nil {
+		log.Printf("Error in transaction: %v", err)
+		return "" // Return an empty string in case of error
+	}
+	return txHash
+}
+
+func writeTransactionHash(txHash string) error {
+	if txHash == "" {
+		return nil
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	locked, err := fileLock.TryLock()
+	if err != nil {
+		return fmt.Errorf("error acquiring file lock: %v", err)
+	}
+	if !locked {
+		return fmt.Errorf("could not acquire file lock")
+	}
+	defer fileLock.Unlock()
+
+	file, err := os.OpenFile("hash.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return fmt.Errorf("error opening file: %v", err)
+	}
+	defer file.Close()
+
+	if _, err := file.WriteString(txHash + "\n"); err != nil {
+		return fmt.Errorf("error writing to file: %v", err)
+	}
+
+	return nil
 }
 
 func getContractAddress() (string, error) {
