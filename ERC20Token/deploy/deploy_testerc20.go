@@ -42,7 +42,7 @@ func deployTestERC20Contract() string {
 	fmt.Printf("Transaction hash: 0x%x\n\n", tx.Hash())
 
 	// Write address to file
-	rootDir := filepath.Join("..") // Adjust this based on your project structure
+	rootDir := filepath.Join("./") // Adjust this based on your project structure
 	filePath := filepath.Join(rootDir, "contract_address.txt")
 	err = os.WriteFile(filePath, []byte(address.String()), 0644)
 	if err != nil {
