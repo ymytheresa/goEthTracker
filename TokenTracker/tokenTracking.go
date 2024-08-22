@@ -20,9 +20,10 @@ import (
 
 // TransferEvent represents a simplified transfer event
 type TransferEvent struct {
-	From  string
-	To    string
-	Value string
+	From   string
+	To     string
+	Value  string
+	TxHash string
 }
 
 // TokenTracker handles the tracking of ERC20 token events
@@ -46,8 +47,17 @@ func setTokenTracker() TokenTracker {
 		log.Fatal(err)
 	}
 
+	client := interact.GetClient()
+
+	// Verify connection to the correct network
+	networkID, err := client.NetworkID(context.Background())
+	if err != nil {
+		log.Fatal("Failed to get network ID:", err)
+	}
+	fmt.Printf("Connected to network with ID: %s\n", networkID.String())
+
 	return TokenTracker{
-		client:              interact.GetClient(),
+		client:              client,
 		contractAddress:     contractAddress,
 		ownerAddress:        ownerAddress,
 		transfers:           []TransferEvent{},
@@ -57,29 +67,27 @@ func setTokenTracker() TokenTracker {
 
 // StartTracking begins listening for Transfer events
 func (t *TokenTracker) StartTracking() error {
-	query := ethereum.FilterQuery{
-		Addresses: []common.Address{t.contractAddress, t.ownerAddress},
-	}
-
 	logs := make(chan types.Log)
-	sub, err := t.client.SubscribeFilterLogs(context.Background(), query, logs)
+	sub, err := t.client.SubscribeFilterLogs(context.Background(), ethereum.FilterQuery{}, logs)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to logs: %v", err)
 	}
 
 	go func() {
+		fmt.Println("Starting to listen for all events...")
 		for {
 			select {
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case vLog := <-logs:
+				fmt.Printf("Received log: %+v\n", vLog)
 				event, err := t.parseTransferEvent(vLog)
 				if err != nil {
-					log.Printf("Failed to parse transfer event: %v", err)
+					log.Printf("Failed to parse event: %v", err)
 					continue
 				}
 				t.transfers = append(t.transfers, event)
-				fmt.Printf("Transfer: %s tokens from %s to %s\n", event.Value, event.From, event.To)
+				fmt.Printf("Event: From %s, To %s, Value %s, TxHash %s\n", event.From, event.To, event.Value, event.TxHash)
 			}
 		}
 	}()
@@ -89,21 +97,12 @@ func (t *TokenTracker) StartTracking() error {
 
 // parseTransferEvent parses a log entry into a TransferEvent
 func (t *TokenTracker) parseTransferEvent(vLog types.Log) (TransferEvent, error) {
-	event := TransferEvent{}
-	contract, err := contractsgo.NewTestERC20(t.contractAddress, t.client)
-	if err != nil {
-		return event, fmt.Errorf("failed to create contract instance: %v", err)
+	event := TransferEvent{
+		From:   vLog.Topics[1].Hex(),
+		To:     vLog.Topics[2].Hex(),
+		Value:  new(big.Int).SetBytes(vLog.Data).String(),
+		TxHash: vLog.TxHash.Hex(),
 	}
-
-	transferEvent, err := contract.ParseTransfer(vLog)
-	if err != nil {
-		return event, fmt.Errorf("failed to parse transfer event: %v", err)
-	}
-
-	event.From = transferEvent.From.Hex()
-	event.To = transferEvent.To.Hex()
-	event.Value = transferEvent.Value.String()
-
 	return event, nil
 }
 
@@ -178,7 +177,7 @@ func (t *TokenTracker) updateTotalTransferredOut() {
 	for i := len(t.transfers) - 1; i >= 0 && transferCount < 5; i-- {
 		event := t.transfers[i]
 		if event.From == t.ownerAddress.Hex() {
-			fmt.Printf("To: %s, Amount: %s\n", event.To, event.Value)
+			fmt.Printf("To: %s, Amount: %s, TxHash: %s\n", event.To, event.Value, event.TxHash)
 			transferCount++
 		}
 	}
