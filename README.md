@@ -1,4 +1,4 @@
-Certainly! Here's a README.md file for your ERC20 Token Monitor CLI project:
+
 
 ```markdown
 # ERC20 Token Monitor CLI
