@@ -1,6 +1,12 @@
 # Crypto Airdrop Tracker
 
 This CLI tool allows you to track crypto airdrops by token owner using a local Ethereum network (Ganache).
+Project limitations:
+
+Due to insufficient testnet ETH, deployment is restricted to a local Ganache network rather than a public testnet.
+Live block tracking is currently unavailable on ARM-based Macs due to an unforeseen websocket compatibility issue.
+
+These limitations affect the tool's ability to monitor real-time blockchain activity.
 
 ## Prerequisites
 
