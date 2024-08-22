@@ -5,6 +5,7 @@ go 1.22
 require (
 	github.com/defiweb/go-eth v0.6.1
 	github.com/ethereum/go-ethereum v1.12.2
+	github.com/gofrs/flock v0.8.1
 	github.com/joho/godotenv v1.5.1
 )
 

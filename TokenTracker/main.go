@@ -1,6 +1,9 @@
 package main
 
-import "log"
+import (
+	"log"
+	"time"
+)
 
 func main() {
 	// tracker := setTokenTracker()
@@ -12,7 +15,7 @@ func main() {
 	// // Keep the main goroutine running
 	// select {}
 	tracker := setTokenTracker()
-	err := tracker.StartTracking()
+	err := tracker.StartTracking(1 * time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}

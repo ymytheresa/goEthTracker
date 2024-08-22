@@ -22,11 +22,15 @@ var (
 	testERC20Mu       sync.Mutex
 )
 
-func TransferTokens(contractAddress string, toAddress common.Address, value int64) {
+func TransferTokens(contractAddress string, toAddress common.Address, value int64) (string, error) {
 	_, client, fromAddress, nonce, gasPrice, _ := connection.GetNextTransaction()
 
 	fmt.Println("Transferring TestERC20 tokens...")
-	transferTokensWithGasEstimate(client, fromAddress, toAddress, nonce, gasPrice, value, contractAddress)
+	txHash, err := transferTokensWithGasEstimate(client, fromAddress, toAddress, nonce, gasPrice, value, contractAddress)
+	if err != nil {
+		return "", err
+	}
+	return txHash.Hex(), nil
 }
 
 func GetClient() *ethclient.Client {
@@ -42,16 +46,16 @@ func GetTestERC20Contract(client *ethclient.Client, contractAddress string) *con
 	return testERC20
 }
 
-func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.Address, toAddress common.Address, nonce uint64, gasPrice *big.Int, value int64, contractAddress string) {
+func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.Address, toAddress common.Address, nonce uint64, gasPrice *big.Int, value int64, contractAddress string) (common.Hash, error) {
 	gasLimit, err := estimateGasForTransfer(client, fromAddress, toAddress, contractAddress, value)
 	if err != nil {
-		log.Fatal(err)
+		return common.Hash{}, err
 	}
 	fmt.Println("Estimated gas:", gasLimit)
 
 	auth, _, _, _, _, err := connection.GetNextTransaction()
 	if err != nil {
-		log.Fatal(err)
+		return common.Hash{}, err
 	}
 
 	auth.From = fromAddress
@@ -70,12 +74,12 @@ func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.
 
 	tx, err := testERC20.Transfer(auth, toAddress, big.NewInt(value))
 	if err != nil {
-		log.Fatalf("Failed to transfer tokens: %v", err)
+		return common.Hash{}, fmt.Errorf("failed to transfer tokens: %v", err)
 	}
 
 	_, err = bind.WaitMined(context.Background(), client, tx)
 	if err != nil {
-		log.Fatal(err)
+		return common.Hash{}, err
 	}
 	fmt.Printf("\nTransaction hash: 0x%x\n", tx.Hash())
 
@@ -83,6 +87,8 @@ func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.
 	printAddressDetails(client, testERC20, "Contract", contractAddressObj)
 	printAddressDetails(client, testERC20, "Sender", fromAddress)
 	printAddressDetails(client, testERC20, "Receiver", toAddress)
+
+	return tx.Hash(), nil
 }
 
 func estimateGasForTransfer(client *ethclient.Client, fromAddress common.Address, toAddress common.Address, contractAddress string, value int64) (uint64, error) {

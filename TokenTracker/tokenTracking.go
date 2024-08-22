@@ -6,8 +6,11 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -33,6 +36,7 @@ type TokenTracker struct {
 	ownerAddress        common.Address
 	transfers           []TransferEvent
 	totalTransferredOut *big.Int
+	contractABI         abi.ABI
 }
 
 func setTokenTracker() TokenTracker {
@@ -55,54 +59,68 @@ func setTokenTracker() TokenTracker {
 	}
 	fmt.Printf("Connected to network with ID: %s\n", networkID.String())
 
+	contractABI, err := abi.JSON(strings.NewReader(contractsgo.TestERC20ABI))
+	if err != nil {
+		log.Fatal("Failed to parse contract ABI:", err)
+	}
+
 	return TokenTracker{
 		client:              client,
 		contractAddress:     contractAddress,
 		ownerAddress:        ownerAddress,
 		transfers:           []TransferEvent{},
 		totalTransferredOut: big.NewInt(0),
+		contractABI:         contractABI,
 	}
 }
 
 // StartTracking begins listening for Transfer events
-func (t *TokenTracker) StartTracking() error {
-	txHash := common.HexToHash("0xcb6d95b941d3213eeaaaf3d8b78cec8b4d71400f9712bc649a1e64d59124ab85")
-	tx, isPending, err := t.client.TransactionByHash(context.Background(), txHash)
+func (t *TokenTracker) StartTracking(interval time.Duration) error {
+	// Create a filter query for Transfer events
+	transferEvent, ok := t.contractABI.Events["Transfer"]
+	if !ok {
+		return fmt.Errorf("Transfer event not found in ABI")
+	}
+	transferEventTopic := transferEvent.ID
+
+	query := ethereum.FilterQuery{
+		Addresses: []common.Address{t.contractAddress},
+		Topics:    [][]common.Hash{{transferEventTopic}},
+	}
+
+	// Create a channel to receive event logs
+	logs := make(chan types.Log)
+
+	// Subscribe to the logs
+	sub, err := t.client.SubscribeFilterLogs(context.Background(), query, logs)
 	if err != nil {
-		return fmt.Errorf("failed to get transaction: %v", err)
+		return fmt.Errorf("failed to subscribe to logs: %v", err)
 	}
 
-	if isPending {
-		fmt.Println("Transaction is still pending")
-	} else {
-		receipt, err := t.client.TransactionReceipt(context.Background(), txHash)
-		if err != nil {
-			return fmt.Errorf("failed to get transaction receipt: %v", err)
-		}
-
-		fmt.Printf("Transaction details:\n")
-		from, err := types.Sender(types.NewEIP155Signer(tx.ChainId()), tx)
-		if err != nil {
-			return fmt.Errorf("failed to get transaction sender: %v", err)
-		}
-		fmt.Printf("From: %s\n", from.Hex())
-		fmt.Printf("To: %s\n", tx.To().Hex())
-		fmt.Printf("Value: %s wei\n", tx.Value().String())
-		fmt.Printf("Gas Price: %s wei\n", tx.GasPrice().String())
-		fmt.Printf("Gas Limit: %d\n", tx.Gas())
-		fmt.Printf("Nonce: %d\n", tx.Nonce())
-		fmt.Printf("Block Number: %d\n", receipt.BlockNumber)
-		fmt.Printf("Gas Used: %d\n", receipt.GasUsed)
-
-		for _, log := range receipt.Logs {
-			event, err := t.parseTransferEvent(*log)
-			if err != nil {
-				fmt.Printf("Failed to parse event: %v\n", err)
-				continue
+	// Start a goroutine to process the logs
+	go func() {
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Printf("Error in subscription: %v", err)
+				return
+			case vLog := <-logs:
+				event, err := t.parseTransferEvent(vLog)
+				if err != nil {
+					log.Printf("Failed to parse event: %v", err)
+					continue
+				}
+				t.transfers = append(t.transfers, event)
+				if event.From == t.ownerAddress.Hex() || event.To == t.ownerAddress.Hex() {
+					fmt.Printf("Transfer Event: From %s, To %s, Value %s, TxHash %s\n",
+						event.From, event.To, event.Value, event.TxHash)
+				}
 			}
-			fmt.Printf("Transfer Event: From %s, To %s, Value %s\n", event.From, event.To, event.Value)
 		}
-	}
+	}()
+
+	// Start the periodic total transferred out update
+	go t.MonitorContractTransfers(interval)
 
 	return nil
 }
@@ -154,15 +172,6 @@ func (t *TokenTracker) MonitorContractTransfers(interval time.Duration) {
 }
 
 func (t *TokenTracker) updateTotalTransferredOut() {
-	if t.contract == nil {
-		var err error
-		t.contract, err = contractsgo.NewTestERC20(t.contractAddress, t.client)
-		if err != nil {
-			log.Printf("Failed to create contract instance: %v", err)
-			return
-		}
-	}
-
 	ownerBalance, err := t.contract.BalanceOf(&bind.CallOpts{}, t.ownerAddress)
 	if err != nil {
 		log.Printf("Failed to get owner balance: %v", err)
