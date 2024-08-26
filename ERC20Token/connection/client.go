@@ -28,6 +28,7 @@ func GoDotEnvVariable(key string) string {
 }
 
 func Connection() (*ethclient.Client, *big.Int, common.Address, *ecdsa.PrivateKey) {
+	//poor quality code that the Connection restricted the transaction to the contract owner's address only
 	client, err := ethclient.Dial(GoDotEnvVariable("GANACHE_URL"))
 	if err != nil {
 		log.Fatal(err)
@@ -63,7 +64,15 @@ func Connection() (*ethclient.Client, *big.Int, common.Address, *ecdsa.PrivateKe
 	fmt.Println("The ETH balance of the account is:", balance)
 	fmt.Println("------------------------------------------------------------------------")
 
-	return client, chainID, fromAddress, privateKey
+	return client, chainID, fromAddress, privateKey //return contract owner's address as fromAddress
+}
+
+func GetClientForContractTx() *ethclient.Client {
+	client, err := ethclient.Dial(GoDotEnvVariable("GANACHE_URL"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	return client
 }
 
 // GetNextTransaction returns the next transaction in the pending transaction queue

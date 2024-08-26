@@ -23,7 +23,7 @@ var (
 )
 
 func TransferTokens(contractAddress string, toAddress common.Address, value int64) (string, error) {
-	_, client, fromAddress, nonce, gasPrice, _ := connection.GetNextTransaction()
+	_, client, fromAddress, nonce, gasPrice, _ := connection.GetNextTransaction() //fromAddress is contract owner's address
 
 	fmt.Println("Transferring TestERC20 tokens...")
 	txHash, err := transferTokensWithGasEstimate(client, fromAddress, toAddress, nonce, gasPrice, value, contractAddress)
@@ -64,7 +64,7 @@ func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.
 	auth.GasLimit = gasLimit
 	auth.GasPrice = gasPrice
 
-	testERC20 := GetTestERC20Contract(client, contractAddress)
+	testERC20 := GetTestERC20Contract(client, contractAddress) //contractOwner consent, contract address
 	contractAddressObj := common.HexToAddress(contractAddress)
 
 	fmt.Println("\nBefore Transfer:")
@@ -72,12 +72,12 @@ func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.
 	printAddressDetails(client, testERC20, "Sender", fromAddress)
 	printAddressDetails(client, testERC20, "Receiver", toAddress)
 
-	tx, err := testERC20.Transfer(auth, toAddress, big.NewInt(value))
+	tx, err := testERC20.Transfer(auth, toAddress, big.NewInt(value)) //with contract owner consent and contract address, and toAddress, we now transfer tokens
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("failed to transfer tokens: %v", err)
 	}
 
-	_, err = bind.WaitMined(context.Background(), client, tx)
+	_, err = bind.WaitMined(context.Background(), client, tx) //wait for the transaction to be mined
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -92,7 +92,7 @@ func transferTokensWithGasEstimate(client *ethclient.Client, fromAddress common.
 }
 
 func estimateGasForTransfer(client *ethclient.Client, fromAddress common.Address, toAddress common.Address, contractAddress string, value int64) (uint64, error) {
-	store := abi.MustParseMethod("transfer(address,uint256)")
+	store := abi.MustParseMethod("transfer(address,uint256)") //calling transfer function inside goeth abi for ERC20 contract
 
 	abiData, err := store.EncodeArgs(toAddress, big.NewInt(value))
 	if err != nil {
@@ -103,7 +103,7 @@ func estimateGasForTransfer(client *ethclient.Client, fromAddress common.Address
 
 	callMsg := ethereum.CallMsg{
 		From:     fromAddress,
-		To:       &toContractAddress,
+		To:       &toContractAddress,	//this line always takes contract address
 		GasPrice: nil,
 		Value:    big.NewInt(0),
 		Data:     abiData,

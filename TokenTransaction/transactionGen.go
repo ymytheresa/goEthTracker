@@ -40,7 +40,7 @@ func RandomTransaction(interval time.Duration, done chan bool) {
 		for {
 			select {
 			case <-ticker.C:
-				txHash := transact(contractAddr, randomAddresses)
+				txHash := transact(contractAddr, randomAddresses) //doesnt mean its transferring from contract address, its transferring from contract owner's address
 				if err := writeTransactionHash(txHash); err != nil {
 					log.Printf("Error writing transaction hash: %v", err)
 				}
@@ -53,7 +53,7 @@ func RandomTransaction(interval time.Duration, done chan bool) {
 
 func transact(contractAddr string, randomAddresses []common.Address) string {
 	recipient := randomAddresses[rand.Intn(len(randomAddresses))]
-	txHash, err := interact.TransferTokens(contractAddr, recipient, int64(rand.Intn(100)))
+	txHash, err := interact.TransferTokens(contractAddr, recipient, int64(rand.Intn(100))) //transferring tokens from contract owner's address to random address actually. but contract address is needed
 	if err != nil {
 		log.Printf("Error in transaction: %v", err)
 		return "" // Return an empty string in case of error

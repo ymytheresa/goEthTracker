@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/interact"
+	"github.com/ymytheresa/erc20-token-tracker/ERC20Token/connection"
 )
 
 var (
@@ -82,7 +82,7 @@ func processTransactions() error {
 
 func getEventsForHash(txHash string) ([]TransferEvent, error) {
 	hash := common.HexToHash(txHash)
-	client := interact.GetClient()
+	client := connection.GetClientForContractTx() //this client is for pulling tx receipt only
 	receipt, err := client.TransactionReceipt(context.Background(), hash)
 	if err != nil {
 		return nil, fmt.Errorf("error getting transaction receipt: %v", err)
